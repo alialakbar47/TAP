@@ -2,8 +2,10 @@
 import common
 from language_models import GPT, PaLM, HuggingFace, APIModelLlama7B, APIModelVicuna13B, GeminiPro
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from config import VICUNA_PATH, LLAMA_PATH, ATTACK_TEMP, TARGET_TEMP, ATTACK_TOP_P, TARGET_TOP_P, MAX_PARALLEL_STREAMS 
+from transformers.utils import logging
+logging.set_verbosity_error()  # Only show errors
 
 def load_target_model(args):
     target_llm = TargetLLM(model_name = args.target_model, 
@@ -117,7 +119,7 @@ class AttackLLM():
                                                         top_p = self.top_p
                                                     )
                 )
-            
+            print(outputs_list)
             # Check for valid outputs and update the list
             new_indices_to_regenerate = []
             for i, full_output in enumerate(outputs_list):
@@ -203,6 +205,7 @@ class TargetLLM():
                                                             top_p = self.top_p
                                                         )
             )
+            print(outputs_list)
         return outputs_list
 
 
@@ -222,12 +225,29 @@ def load_indiv_model(model_name):
         lm = APIModelLlama7B(model_name)
     elif model_name == 'vicuna-api-model':
         lm = APIModelVicuna13B(model_name)
+    elif model_name == "Q-vicuna":
+      
+        modelname = "lmsys/vicuna-13b-v1.5"
+
+        bnb_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",  # NormalFloat4 (better performance)
+            bnb_4bit_compute_dtype="float16",  # Mixed precision
+            bnb_4bit_use_double_quant=True  # Double quantization
+            )
+        model = AutoModelForCausalLM.from_pretrained(
+             modelname,
+             quantization_config=bnb_config,
+            device_map="auto"
+            )
+        tokenizer = AutoTokenizer.from_pretrained(modelname)
+        lm = HuggingFace(model_name, model, tokenizer)
+        
     else:
         model = AutoModelForCausalLM.from_pretrained(
-                model_path, 
-                torch_dtype=torch.float16,
-                low_cpu_mem_usage=True,
-                device_map="auto").eval()
+            model_path,
+          device_map="auto",
+          torch_dtype="auto",).eval()
 
         tokenizer = AutoTokenizer.from_pretrained(
             model_path,
@@ -288,6 +308,10 @@ def get_model_path_and_template(model_name):
         "gemini-pro": {
             "path": "gemini-pro",
             "template": "gemini-pro"
+        },
+                "Q-vicuna": {
+            "path": None,
+            "template": "vicuna_v1.5"
         }
     }
     path, template = full_model_dict[model_name]["path"], full_model_dict[model_name]["template"]
