@@ -264,7 +264,8 @@ if __name__ == '__main__':
                  "gpt-4", 
                  "gpt-4-turbo", 
                  "gpt-4-1106-preview", # This is same as gpt-4-turbo
-                 'llama-2-api-model']
+                 'llama-2-api-model',
+                 "Q-vicuna"]
     )
     parser.add_argument(
         "--attack-max-n-tokens",
@@ -295,6 +296,7 @@ if __name__ == '__main__':
                  'gpt-4-1106-preview', # This is same as gpt-4-turbo
                  "palm-2",
                  "gemini-pro",
+                 "Q-vicuna"
                  ]
     )
     parser.add_argument(
@@ -314,7 +316,8 @@ if __name__ == '__main__':
                  "gpt-4", 
                  "gpt-4-turbo", 
                  "gpt-4-1106-preview", 
-                 "no-evaluator"]
+                 "no-evaluator",
+                 'meta-llama/Llama-3.2-1B-Instruct']
     )
     parser.add_argument(
         "--evaluator-max-n-tokens",
