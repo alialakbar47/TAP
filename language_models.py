@@ -1,5 +1,4 @@
 import openai
-import anthropic
 import os
 import time
 import torch
@@ -11,7 +10,7 @@ from copy import deepcopy
 
 from config import LLAMA_API_LINK, VICUNA_API_LINK
 
-    
+#function
 class LanguageModel():
     def __init__(self, model_name):
         self.model_name = model_name
