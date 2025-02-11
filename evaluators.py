@@ -118,12 +118,10 @@ class LlamaEvaluator(EvaluatorBase):
         super(LlamaEvaluator, self).__init__(args)
         self.model_path = args.evaluator_model
 
-        print(f"Loading LLaMA model from {self.model_path}...")
+        print(f"Loading LLaMA model from {self.model_path} on CPU...")
         self.evaluator_model = AutoModelForCausalLM.from_pretrained(
-            "meta-llama/Llama-3.2-1B-Instruct",
-            device_map="auto",
-            torch_dtype="auto",
-        ).eval()
+            "meta-llama/Llama-3.2-1B-Instruct"
+        ).to("cpu").eval()  # ✅ Move model to CPU
 
         self.tokenizer = AutoTokenizer.from_pretrained(
             "meta-llama/Llama-3.2-1B-Instruct",
@@ -131,17 +129,22 @@ class LlamaEvaluator(EvaluatorBase):
         )
 
     def generate(self, prompt):
-    # Tokenize the prompt
-      input_ids = self.tokenizer(prompt, return_tensors="pt").input_ids
+        # Tokenize the prompt
+        input_ids = self.tokenizer(prompt, return_tensors="pt").input_ids
 
-    # Ensure input_ids is on the same device as the model
-      input_ids = input_ids.to(self.evaluator_model.device)
+        # Move inputs to CPU
+        input_ids = input_ids.to("cpu")
 
-    # Generate output
-      outputs = self.evaluator_model.generate(
-        input_ids=input_ids,
-        pad_token_id=self.tokenizer.eos_token_id,
-      )
+        # Generate output
+        outputs = self.evaluator_model.generate(
+            input_ids=input_ids,
+            pad_token_id=self.tokenizer.eos_token_id,
+        )
+
+        # Decode outputs
+        decoded_outputs = [self.tokenizer.decode(output, skip_special_tokens=True) for output in outputs]
+        return decoded_outputs
+
 
     # Decode outputs
       decoded_outputs = [self.tokenizer.decode(output, skip_special_tokens=True) for output in outputs]
