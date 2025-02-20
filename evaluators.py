@@ -143,15 +143,8 @@ class LlamaEvaluator(EvaluatorBase):
 
         # Decode outputs
         decoded_outputs = [self.tokenizer.decode(output, skip_special_tokens=True) for output in outputs]
+        print(decoded_outputs)
         return decoded_outputs
-
-
-    # Decode outputs
-      decoded_outputs = [self.tokenizer.decode(output, skip_special_tokens=True) for output in outputs]
-
-      return decoded_outputs
-
-
 
     def judge_score(self, attack_prompt_list, target_response_list):
        prompts = [self.get_evaluator_prompt(prompt, response) for prompt, response in zip(attack_prompt_list, target_response_list)]
