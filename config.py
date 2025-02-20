@@ -1,4 +1,4 @@
-VICUNA_PATH = "lmsys/vicuna-13b-v1.5" # ADD PATH
+VICUNA_PATH = "meta-llama/Llama-3.2-1B-Instruct" # ADD PATH
 LLAMA_PATH = "meta-llama/Llama-3.2-1B-Instruct" # ADD PATH
 
 VICUNA_API_LINK ="https://..." # ADD LINK
