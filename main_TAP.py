@@ -92,16 +92,24 @@ def main(args):
 
     # Initialize attack parameters
     attack_params = {
-         'width': args.width,
-         'branching_factor': args.branching_factor, 
-         'depth': args.depth
+        'width': args.width,
+        'branching_factor': args.branching_factor, 
+        'depth': args.depth
     }
     
+    # Load custom system prompt if provided
+    if args.custom_system_prompt:
+        with open(args.custom_system_prompt, 'r') as f:
+            system_prompt = f.read()
+        print("Loaded custom system prompt.", flush=True)
+    else:
+        # Use default system prompt
+        system_prompt = get_attacker_system_prompt(
+            args.goal,
+            args.target_str
+        )
+
     # Initialize models and logger 
-    system_prompt = get_attacker_system_prompt(
-        args.goal,
-        args.target_str
-    )
     attack_llm, target_llm = load_attack_and_target_models(args)
     print('Done loading attacker and target!', flush=True)
 
@@ -123,7 +131,6 @@ def main(args):
         conv.set_system_message(system_prompt)
 
     # Begin TAP
-
     print('Beginning TAP!', flush=True)
 
     for iteration in range(1, attack_params['depth'] + 1): 
@@ -144,14 +151,13 @@ def main(args):
                 c_new.parent_id = c_old.self_id
             
             extracted_attack_list.extend(
-                    attack_llm.get_attack(convs_list_copy, processed_response_list)
-                )
+                attack_llm.get_attack(convs_list_copy, processed_response_list)
+            )
             convs_list_new.extend(convs_list_copy)
 
         # Remove any failed attacks and corresponding conversations
         convs_list = copy.deepcopy(convs_list_new)
         extracted_attack_list, convs_list = clean_attacks_and_convs(extracted_attack_list, convs_list)
-        
         
         adv_prompt_list = [attack["prompt"] for attack in extracted_attack_list]
         improv_list = [attack["improvement"] for attack in extracted_attack_list]
@@ -159,10 +165,8 @@ def main(args):
         ############################################################
         #   PRUNE: PHASE 1 
         ############################################################
-        # Get on-topic-scores (does the adv_prompt asks for same info as original prompt)
         on_topic_scores = evaluator_llm.on_topic_score(adv_prompt_list, original_prompt)
 
-        # Prune attacks which are irrelevant
         (on_topic_scores,
         _,
         adv_prompt_list,
@@ -171,33 +175,29 @@ def main(args):
         _,
         extracted_attack_list) = prune(
             on_topic_scores,
-            None, # judge_scores
+            None,
             adv_prompt_list,
             improv_list,
             convs_list,
-            None, # target_response_list
+            None,
             extracted_attack_list,
             sorting_score=on_topic_scores,
             attack_params=attack_params)
 
-            
         print(f'Total number of prompts (after pruning phase 1) are {len(adv_prompt_list)}')
 
-        
         ############################################################
         #   QUERY AND ASSESS
         ############################################################
         target_response_list = target_llm.get_response(adv_prompt_list)
         print("Finished getting target responses.") 
 
-        # Get judge-scores (i.e., likelihood of jailbreak) from Evaluator
         judge_scores = evaluator_llm.judge_score(adv_prompt_list, target_response_list)
         print("Finished getting judge scores from evaluator.")
 
         ############################################################
         #   PRUNE: PHASE 2 
         ############################################################
-        # Prune attacks which to be fewer than attack_params['width']
         (on_topic_scores,
         judge_scores,
         adv_prompt_list,
@@ -215,38 +215,33 @@ def main(args):
             sorting_score=judge_scores,
             attack_params=attack_params) 
 
-        # WandB log values
         logger.log(iteration, 
-                extracted_attack_list,
-                target_response_list,
-                judge_scores,
-                on_topic_scores,
-                conv_ids=[c.self_id for c in convs_list],
-                parent_conv_ids=[c.parent_id for c in convs_list])
+                   extracted_attack_list,
+                   target_response_list,
+                   judge_scores,
+                   on_topic_scores,
+                   conv_ids=[c.self_id for c in convs_list],
+                   parent_conv_ids=[c.parent_id for c in convs_list])
 
-        # Truncate conversation to avoid context length issues
         for conv in convs_list:
-            # Note that this does not delete the conv.role (i.e., the system prompt)
             conv.messages = conv.messages[-2*(args.keep_last_n):]
 
-        # Early stopping criterion
         if any([score == 10 for score in judge_scores]):
             print("Found a jailbreak. Exiting.")
             break
 
-        # `process_target_response` concatenates the target response, goal, and score 
-        #   -- while adding appropriate labels to each
         processed_response_list = [
-                process_target_response(
-                        target_response=target_response, 
-                        score=score,
-                        goal=args.goal,
-                        target_str=args.target_str
-                    ) 
-                    for target_response, score in zip(target_response_list, judge_scores)
-            ] 
+            process_target_response(
+                target_response=target_response, 
+                score=score,
+                goal=args.goal,
+                target_str=args.target_str
+            ) 
+            for target_response, score in zip(target_response_list, judge_scores)
+        ] 
 
     logger.finish()
+
 
 
 if __name__ == '__main__':
